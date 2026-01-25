@@ -191,9 +191,12 @@ class MainWindow(QMainWindow):
         results_buttons_layout = QHBoxLayout()
         self.save_results_button = QPushButton("Сохранить выбранные")
         self.save_results_button.clicked.connect(self.on_save_results)
+        self.open_result_button = QPushButton("Открыть")
+        self.open_result_button.clicked.connect(self.on_open_result)
         self.clear_results_button = QPushButton("Очистить результаты")
         self.clear_results_button.clicked.connect(self.on_clear_results)
         results_buttons_layout.addWidget(self.save_results_button)
+        results_buttons_layout.addWidget(self.open_result_button)
         results_buttons_layout.addWidget(self.clear_results_button)
         results_layout.addLayout(results_buttons_layout)
         
@@ -465,6 +468,29 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить результаты: {str(e)}")
     
+    def on_open_result(self):
+        """Открывает детальное окно с информацией о выбранном результате."""
+        current_row = self.results_table.currentRow()
+        if current_row < 0:
+            QMessageBox.warning(self, "Предупреждение", "Выберите строку с результатом для просмотра")
+            return
+        
+        if current_row >= len(self.temporary_results):
+            return
+        
+        result = self.temporary_results[current_row]
+        
+        # Получаем промт
+        prompt_text = self.prompt_edit.toPlainText()
+        if self.current_prompt_id:
+            prompt_data = db.get_prompt_by_id(self.current_prompt_id)
+            if prompt_data:
+                prompt_text = prompt_data['prompt']
+        
+        # Открываем диалог с детальной информацией
+        dialog = ResultDetailDialog(self, result, prompt_text)
+        dialog.exec_()
+    
     def on_clear_results(self):
         """Очищает временную таблицу результатов."""
         self.results_table.setRowCount(0)
@@ -618,6 +644,69 @@ class MainWindow(QMainWindow):
                          "ChatList v1.0\n\n"
                          "Приложение для сравнения ответов различных нейросетей.\n"
                          "Отправляйте один промт в несколько моделей и сравнивайте результаты.")
+
+
+class ResultDetailDialog(QDialog):
+    """Диалог для детального просмотра результата."""
+    
+    def __init__(self, parent=None, result: Optional[Dict[str, Any]] = None, prompt: str = ""):
+        super().__init__(parent)
+        self.result = result
+        self.prompt = prompt
+        self.setWindowTitle("Детали результата")
+        self.setModal(True)
+        self.setGeometry(200, 200, 800, 600)
+        self.init_ui()
+        self.load_data()
+    
+    def init_ui(self):
+        layout = QVBoxLayout()
+        
+        # Модель
+        model_layout = QFormLayout()
+        model_label = QLabel("Модель:")
+        model_value = QLabel(self.result.get('model_name', 'Неизвестная модель') if self.result else '')
+        model_value.setWordWrap(True)
+        model_layout.addRow(model_label, model_value)
+        layout.addLayout(model_layout)
+        
+        # Промт
+        prompt_group = QGroupBox("Промт")
+        prompt_layout = QVBoxLayout()
+        self.prompt_text = QTextEdit()
+        self.prompt_text.setReadOnly(True)
+        self.prompt_text.setMaximumHeight(150)
+        prompt_layout.addWidget(self.prompt_text)
+        prompt_group.setLayout(prompt_layout)
+        layout.addWidget(prompt_group)
+        
+        # Ответ
+        response_group = QGroupBox("Ответ")
+        response_layout = QVBoxLayout()
+        self.response_text = QTextEdit()
+        self.response_text.setReadOnly(True)
+        response_layout.addWidget(self.response_text)
+        response_group.setLayout(response_layout)
+        layout.addWidget(response_group, stretch=1)
+        
+        # Кнопка закрытия
+        close_button = QPushButton("Закрыть")
+        close_button.clicked.connect(self.accept)
+        layout.addWidget(close_button)
+        
+        self.setLayout(layout)
+    
+    def load_data(self):
+        """Загружает данные в диалог."""
+        if self.result:
+            # Загружаем промт
+            self.prompt_text.setPlainText(self.prompt)
+            
+            # Загружаем ответ
+            response_text = self.result.get('response_text', '')
+            if self.result.get('error'):
+                response_text = f"Ошибка: {self.result.get('error', 'Неизвестная ошибка')}"
+            self.response_text.setPlainText(response_text)
 
 
 class SettingsDialog(QDialog):
