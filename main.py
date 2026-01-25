@@ -131,16 +131,7 @@ class MainWindow(QMainWindow):
         main_tab_layout = QVBoxLayout()
         main_tab.setLayout(main_tab_layout)
         
-        # Разделитель для основной вкладки
-        splitter = QSplitter(Qt.Horizontal)
-        main_tab_layout.addWidget(splitter)
-        
-        # Левая панель: ввод промта и список промтов
-        left_panel = QWidget()
-        left_layout = QVBoxLayout()
-        left_panel.setLayout(left_layout)
-        
-        # Область ввода промта
+        # Область ввода промта (сверху)
         prompt_group = QGroupBox("Ввод промта")
         prompt_layout = QVBoxLayout()
         
@@ -170,15 +161,9 @@ class MainWindow(QMainWindow):
         prompt_layout.addLayout(buttons_layout)
         
         prompt_group.setLayout(prompt_layout)
-        left_layout.addWidget(prompt_group)
+        main_tab_layout.addWidget(prompt_group)
         
-        splitter.addWidget(left_panel)
-        
-        # Правая панель: результаты
-        right_panel = QWidget()
-        right_layout = QVBoxLayout()
-        right_panel.setLayout(right_layout)
-        
+        # Таблица результатов (снизу)
         results_group = QGroupBox("Результаты")
         results_layout = QVBoxLayout()
         
@@ -189,12 +174,15 @@ class MainWindow(QMainWindow):
         
         self.results_table = QTableWidget()
         self.results_table.setColumnCount(3)
-        self.results_table.setHorizontalHeaderLabels(["Модель", "Ответ", "Выбрано"])
+        self.results_table.setHorizontalHeaderLabels(["Выбрано", "Модель", "Ответ"])
         self.results_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.results_table.setSortingEnabled(True)  # Включаем сортировку
-        self.results_table.setColumnWidth(0, 150)
-        self.results_table.setColumnWidth(1, 500)  # Увеличена ширина для ответов
-        self.results_table.setColumnWidth(2, 80)
+        self.results_table.setColumnWidth(0, 80)  # Выбрано
+        self.results_table.setColumnWidth(1, 150)  # Модель
+        # Настраиваем растягивание колонки "Ответ" при изменении размера окна
+        self.results_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)  # Выбрано - фиксированная
+        self.results_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Fixed)  # Модель - фиксированная
+        self.results_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)  # Ответ - растягивается
         # Настраиваем высоту строк для многострочного отображения
         self.results_table.verticalHeader().setDefaultSectionSize(100)  # Минимальная высота строки
         self.results_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)  # Автоматическая высота
@@ -210,11 +198,7 @@ class MainWindow(QMainWindow):
         results_layout.addLayout(results_buttons_layout)
         
         results_group.setLayout(results_layout)
-        right_layout.addWidget(results_group)
-        
-        splitter.addWidget(right_panel)
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 2)
+        main_tab_layout.addWidget(results_group, stretch=1)  # Растягиваем таблицу результатов
         
         # Вкладка 2: Сохраненные результаты
         results_tab = QWidget()
@@ -425,10 +409,15 @@ class MainWindow(QMainWindow):
         self.results_table.setRowCount(len(results))
         
         for i, result in enumerate(results):
-            # Модель
-            self.results_table.setItem(i, 0, QTableWidgetItem(result['model_name']))
+            # Чекбокс (колонка 0)
+            checkbox = QCheckBox()
+            checkbox.setChecked(False)
+            self.results_table.setCellWidget(i, 0, checkbox)
             
-            # Ответ - используем QTextEdit для многострочного отображения
+            # Модель (колонка 1)
+            self.results_table.setItem(i, 1, QTableWidgetItem(result['model_name']))
+            
+            # Ответ - используем QTextEdit для многострочного отображения (колонка 2)
             response_text = result['response_text']
             if result.get('error'):
                 response_text = f"Ошибка: {result['error']}"
@@ -443,12 +432,7 @@ class MainWindow(QMainWindow):
             # Устанавливаем минимальную высоту
             text_edit.setMinimumHeight(80)
             text_edit.setMaximumHeight(300)  # Максимальная высота для предотвращения слишком больших ячеек
-            self.results_table.setCellWidget(i, 1, text_edit)
-            
-            # Чекбокс
-            checkbox = QCheckBox()
-            checkbox.setChecked(False)
-            self.results_table.setCellWidget(i, 2, checkbox)
+            self.results_table.setCellWidget(i, 2, text_edit)
     
     def on_save_results(self):
         """Сохраняет выбранные результаты в БД."""
@@ -459,7 +443,7 @@ class MainWindow(QMainWindow):
         selected_results = []
         
         for i in range(self.results_table.rowCount()):
-            checkbox = self.results_table.cellWidget(i, 2)
+            checkbox = self.results_table.cellWidget(i, 0)  # Чекбокс теперь в колонке 0
             if checkbox and checkbox.isChecked():
                 result = self.temporary_results[i]
                 if not result.get('error'):
@@ -542,7 +526,7 @@ class MainWindow(QMainWindow):
         # Если есть выбранные результаты во временной таблице
         if self.temporary_results:
             for i in range(self.results_table.rowCount()):
-                checkbox = self.results_table.cellWidget(i, 2)
+                checkbox = self.results_table.cellWidget(i, 0)  # Чекбокс теперь в колонке 0
                 if checkbox and checkbox.isChecked():
                     results.append(self.temporary_results[i])
             prompt = self.prompt_edit.toPlainText()
@@ -583,7 +567,7 @@ class MainWindow(QMainWindow):
         # Если есть выбранные результаты во временной таблице
         if self.temporary_results:
             for i in range(self.results_table.rowCount()):
-                checkbox = self.results_table.cellWidget(i, 2)
+                checkbox = self.results_table.cellWidget(i, 0)  # Чекбокс теперь в колонке 0
                 if checkbox and checkbox.isChecked():
                     results.append(self.temporary_results[i])
             prompt = self.prompt_edit.toPlainText()
