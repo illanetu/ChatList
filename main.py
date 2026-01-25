@@ -172,32 +172,6 @@ class MainWindow(QMainWindow):
         prompt_group.setLayout(prompt_layout)
         left_layout.addWidget(prompt_group)
         
-        # Список промтов
-        prompts_group = QGroupBox("Сохраненные промты")
-        prompts_layout = QVBoxLayout()
-        
-        search_layout = QHBoxLayout()
-        self.prompts_search = QLineEdit()
-        self.prompts_search.setPlaceholderText("Поиск промтов...")
-        self.prompts_search.textChanged.connect(self.on_search_prompts)
-        search_layout.addWidget(self.prompts_search)
-        prompts_layout.addLayout(search_layout)
-        
-        self.prompts_table = QTableWidget()
-        self.prompts_table.setColumnCount(3)
-        self.prompts_table.setHorizontalHeaderLabels(["Дата", "Промт", "Теги"])
-        self.prompts_table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.prompts_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.prompts_table.setSortingEnabled(True)  # Включаем сортировку
-        self.prompts_table.doubleClicked.connect(self.on_prompt_double_clicked)
-        self.prompts_table.setColumnWidth(0, 150)
-        self.prompts_table.setColumnWidth(1, 300)
-        self.prompts_table.setColumnWidth(2, 150)
-        prompts_layout.addWidget(self.prompts_table)
-        
-        prompts_group.setLayout(prompts_layout)
-        left_layout.addWidget(prompts_group)
-        
         splitter.addWidget(left_panel)
         
         # Правая панель: результаты
@@ -294,6 +268,11 @@ class MainWindow(QMainWindow):
         exit_action = file_menu.addAction("Выход")
         exit_action.triggered.connect(self.close)
         
+        # Меню Промты
+        prompts_menu = menubar.addMenu("Промты")
+        manage_prompts_action = prompts_menu.addAction("Управление промтами")
+        manage_prompts_action.triggered.connect(self.on_manage_prompts)
+        
         # Меню Настройки
         settings_menu = menubar.addMenu("Настройки")
         models_action = settings_menu.addAction("Управление моделями")
@@ -314,17 +293,9 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Ошибка", f"Не удалось инициализировать базу данных: {str(e)}")
     
     def load_prompts(self):
-        """Загружает промты из БД и обновляет интерфейс."""
+        """Загружает промты из БД и обновляет комбобокс."""
         try:
             prompts = db.get_all_prompts()
-            self.prompts_table.setRowCount(len(prompts))
-            
-            for i, prompt_data in enumerate(prompts):
-                self.prompts_table.setItem(i, 0, QTableWidgetItem(prompt_data['date']))
-                self.prompts_table.setItem(i, 1, QTableWidgetItem(prompt_data['prompt']))
-                self.prompts_table.setItem(i, 2, QTableWidgetItem(prompt_data.get('tags', '')))
-                self.prompts_table.item(i, 0).setData(Qt.UserRole, prompt_data['id'])
-            
             # Обновляем комбобокс
             self.prompt_combo.clear()
             self.prompt_combo.addItem("")
@@ -368,16 +339,6 @@ class MainWindow(QMainWindow):
                 self.current_prompt_id = prompt_id
                 self.on_clear_results()  # Очищаем временную таблицу
     
-    def on_prompt_double_clicked(self, index):
-        """Обработчик двойного клика по промту в таблице."""
-        row = index.row()
-        prompt_id = self.prompts_table.item(row, 0).data(Qt.UserRole)
-        prompt_data = db.get_prompt_by_id(prompt_id)
-        if prompt_data:
-            self.prompt_edit.setPlainText(prompt_data['prompt'])
-            self.tags_edit.setText(prompt_data.get('tags', ''))
-            self.current_prompt_id = prompt_id
-            self.on_clear_results()
     
     def on_save_prompt(self):
         """Сохраняет промт в БД."""
@@ -525,23 +486,11 @@ class MainWindow(QMainWindow):
         self.results_table.setRowCount(0)
         self.temporary_results = []
     
-    def on_search_prompts(self, text):
-        """Поиск промтов."""
-        if not text:
-            self.load_prompts()
-            return
-        
-        try:
-            prompts = db.search_prompts(text)
-            self.prompts_table.setRowCount(len(prompts))
-            
-            for i, prompt_data in enumerate(prompts):
-                self.prompts_table.setItem(i, 0, QTableWidgetItem(prompt_data['date']))
-                self.prompts_table.setItem(i, 1, QTableWidgetItem(prompt_data['prompt']))
-                self.prompts_table.setItem(i, 2, QTableWidgetItem(prompt_data.get('tags', '')))
-                self.prompts_table.item(i, 0).setData(Qt.UserRole, prompt_data['id'])
-        except Exception as e:
-            QMessageBox.warning(self, "Ошибка", f"Ошибка поиска: {str(e)}")
+    def on_manage_prompts(self):
+        """Открывает диалог управления промтами."""
+        dialog = PromptsManagementDialog(self)
+        if dialog.exec_() == QDialog.Accepted:
+            self.load_prompts()  # Обновляем комбобокс после изменений
     
     def on_search_saved_results(self, text):
         """Поиск сохраненных результатов."""
@@ -737,6 +686,219 @@ class SettingsDialog(QDialog):
         return {
             'timeout': self.timeout_spin.value(),
             'max_retries': self.max_retries_spin.value()
+        }
+
+
+class PromptsManagementDialog(QDialog):
+    """Диалог для управления промтами."""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Управление промтами")
+        self.setModal(True)
+        self.setGeometry(200, 200, 900, 600)
+        self.parent_window = parent
+        self.init_ui()
+        self.load_prompts()
+    
+    def init_ui(self):
+        layout = QVBoxLayout()
+        
+        # Поиск
+        search_layout = QHBoxLayout()
+        self.search_edit = QLineEdit()
+        self.search_edit.setPlaceholderText("Поиск промтов...")
+        self.search_edit.textChanged.connect(self.on_search)
+        search_layout.addWidget(QLabel("Поиск:"))
+        search_layout.addWidget(self.search_edit)
+        layout.addLayout(search_layout)
+        
+        # Кнопки управления
+        buttons_layout = QHBoxLayout()
+        add_button = QPushButton("Добавить")
+        add_button.clicked.connect(self.on_add_prompt)
+        edit_button = QPushButton("Редактировать")
+        edit_button.clicked.connect(self.on_edit_prompt)
+        delete_button = QPushButton("Удалить")
+        delete_button.clicked.connect(self.on_delete_prompt)
+        use_button = QPushButton("Использовать")
+        use_button.clicked.connect(self.on_use_prompt)
+        buttons_layout.addWidget(add_button)
+        buttons_layout.addWidget(edit_button)
+        buttons_layout.addWidget(delete_button)
+        buttons_layout.addWidget(use_button)
+        layout.addLayout(buttons_layout)
+        
+        # Таблица промтов
+        self.prompts_table = QTableWidget()
+        self.prompts_table.setColumnCount(3)
+        self.prompts_table.setHorizontalHeaderLabels(["Дата", "Промт", "Теги"])
+        self.prompts_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.prompts_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.prompts_table.setSortingEnabled(True)
+        self.prompts_table.doubleClicked.connect(self.on_use_prompt)
+        self.prompts_table.setColumnWidth(0, 150)
+        self.prompts_table.setColumnWidth(1, 400)
+        self.prompts_table.setColumnWidth(2, 150)
+        layout.addWidget(self.prompts_table)
+        
+        # Кнопка закрытия
+        close_button = QPushButton("Закрыть")
+        close_button.clicked.connect(self.accept)
+        layout.addWidget(close_button)
+        
+        self.setLayout(layout)
+    
+    def load_prompts(self):
+        """Загружает промты из БД."""
+        try:
+            prompts = db.get_all_prompts()
+            self.prompts_table.setRowCount(len(prompts))
+            
+            for i, prompt_data in enumerate(prompts):
+                self.prompts_table.setItem(i, 0, QTableWidgetItem(prompt_data['date']))
+                self.prompts_table.setItem(i, 1, QTableWidgetItem(prompt_data['prompt']))
+                self.prompts_table.setItem(i, 2, QTableWidgetItem(prompt_data.get('tags', '')))
+                self.prompts_table.item(i, 0).setData(Qt.UserRole, prompt_data['id'])
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить промты: {str(e)}")
+    
+    def on_search(self, text):
+        """Поиск промтов."""
+        if not text:
+            self.load_prompts()
+            return
+        
+        try:
+            prompts = db.search_prompts(text)
+            self.prompts_table.setRowCount(len(prompts))
+            
+            for i, prompt_data in enumerate(prompts):
+                self.prompts_table.setItem(i, 0, QTableWidgetItem(prompt_data['date']))
+                self.prompts_table.setItem(i, 1, QTableWidgetItem(prompt_data['prompt']))
+                self.prompts_table.setItem(i, 2, QTableWidgetItem(prompt_data.get('tags', '')))
+                self.prompts_table.item(i, 0).setData(Qt.UserRole, prompt_data['id'])
+        except Exception as e:
+            QMessageBox.warning(self, "Ошибка", f"Ошибка поиска: {str(e)}")
+    
+    def get_selected_prompt_id(self) -> Optional[int]:
+        """Возвращает ID выбранного промта."""
+        current_row = self.prompts_table.currentRow()
+        if current_row >= 0:
+            return self.prompts_table.item(current_row, 0).data(Qt.UserRole)
+        return None
+    
+    def on_add_prompt(self):
+        """Добавляет новый промт."""
+        dialog = PromptDialog(self)
+        if dialog.exec_() == QDialog.Accepted:
+            data = dialog.get_data()
+            try:
+                db.create_prompt(data['prompt'], data.get('tags'))
+                self.load_prompts()
+                QMessageBox.information(self, "Успех", "Промт добавлен")
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", f"Не удалось добавить промт: {str(e)}")
+    
+    def on_edit_prompt(self):
+        """Редактирует выбранный промт."""
+        prompt_id = self.get_selected_prompt_id()
+        if not prompt_id:
+            QMessageBox.warning(self, "Предупреждение", "Выберите промт для редактирования")
+            return
+        
+        try:
+            prompt_data = db.get_prompt_by_id(prompt_id)
+            if not prompt_data:
+                return
+            
+            dialog = PromptDialog(self, prompt_data)
+            if dialog.exec_() == QDialog.Accepted:
+                data = dialog.get_data()
+                db.update_prompt(prompt_id, data['prompt'], data.get('tags'))
+                self.load_prompts()
+                QMessageBox.information(self, "Успех", "Промт обновлен")
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось обновить промт: {str(e)}")
+    
+    def on_delete_prompt(self):
+        """Удаляет выбранный промт."""
+        prompt_id = self.get_selected_prompt_id()
+        if not prompt_id:
+            QMessageBox.warning(self, "Предупреждение", "Выберите промт для удаления")
+            return
+        
+        reply = QMessageBox.question(self, "Подтверждение", "Удалить выбранный промт?",
+                                     QMessageBox.Yes | QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            try:
+                db.delete_prompt(prompt_id)
+                self.load_prompts()
+                QMessageBox.information(self, "Успех", "Промт удален")
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", f"Не удалось удалить промт: {str(e)}")
+    
+    def on_use_prompt(self):
+        """Использует выбранный промт в основном окне."""
+        prompt_id = self.get_selected_prompt_id()
+        if not prompt_id:
+            return
+        
+        try:
+            prompt_data = db.get_prompt_by_id(prompt_id)
+            if prompt_data and self.parent_window:
+                self.parent_window.prompt_edit.setPlainText(prompt_data['prompt'])
+                self.parent_window.tags_edit.setText(prompt_data.get('tags', ''))
+                self.parent_window.current_prompt_id = prompt_id
+                self.parent_window.on_clear_results()
+                self.accept()  # Закрываем диалог
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Ошибка: {str(e)}")
+
+
+class PromptDialog(QDialog):
+    """Диалог для добавления/редактирования промта."""
+    
+    def __init__(self, parent=None, prompt_data: Optional[Dict[str, Any]] = None):
+        super().__init__(parent)
+        self.prompt_data = prompt_data
+        self.setWindowTitle("Добавить промт" if prompt_data is None else "Редактировать промт")
+        self.setModal(True)
+        self.init_ui()
+        
+        if prompt_data:
+            self.load_prompt_data()
+    
+    def init_ui(self):
+        layout = QFormLayout()
+        
+        self.prompt_edit = QTextEdit()
+        self.prompt_edit.setPlaceholderText("Введите текст промта...")
+        self.prompt_edit.setMinimumHeight(150)
+        layout.addRow("Промт:", self.prompt_edit)
+        
+        self.tags_edit = QLineEdit()
+        self.tags_edit.setPlaceholderText("Теги (через запятую)")
+        layout.addRow("Теги:", self.tags_edit)
+        
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addRow(buttons)
+        
+        self.setLayout(layout)
+    
+    def load_prompt_data(self):
+        """Загружает данные промта в форму."""
+        if self.prompt_data:
+            self.prompt_edit.setPlainText(self.prompt_data.get('prompt', ''))
+            self.tags_edit.setText(self.prompt_data.get('tags', ''))
+    
+    def get_data(self) -> Dict[str, Any]:
+        """Возвращает данные из формы."""
+        return {
+            'prompt': self.prompt_edit.toPlainText().strip(),
+            'tags': self.tags_edit.text().strip()
         }
 
 
