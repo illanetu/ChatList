@@ -685,6 +685,8 @@ class ResultDetailDialog(QDialog):
         response_layout = QVBoxLayout()
         self.response_text = QTextEdit()
         self.response_text.setReadOnly(True)
+        # Включаем поддержку markdown
+        self.response_text.setAcceptRichText(True)
         response_layout.addWidget(self.response_text)
         response_group.setLayout(response_layout)
         layout.addWidget(response_group, stretch=1)
@@ -702,11 +704,17 @@ class ResultDetailDialog(QDialog):
             # Загружаем промт
             self.prompt_text.setPlainText(self.prompt)
             
-            # Загружаем ответ
+            # Загружаем ответ с поддержкой markdown
             response_text = self.result.get('response_text', '')
             if self.result.get('error'):
                 response_text = f"Ошибка: {self.result.get('error', 'Неизвестная ошибка')}"
-            self.response_text.setPlainText(response_text)
+            
+            # Отображаем текст как markdown для форматирования
+            try:
+                self.response_text.setMarkdown(response_text)
+            except:
+                # Если markdown не поддерживается или ошибка, используем обычный текст
+                self.response_text.setPlainText(response_text)
 
 
 class SettingsDialog(QDialog):
