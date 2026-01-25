@@ -113,6 +113,7 @@ class OpenAIClient(BaseAPIClient):
         data = {
             "model": model,
             "messages": [
+                {"role": "system", "content": "Ты помощник, который всегда отвечает на русском языке. Все твои ответы должны быть на русском языке."},
                 {"role": "user", "content": prompt}
             ],
             "temperature": 0.7
@@ -158,6 +159,7 @@ class DeepSeekClient(BaseAPIClient):
         data = {
             "model": model,
             "messages": [
+                {"role": "system", "content": "Ты помощник, который всегда отвечает на русском языке. Все твои ответы должны быть на русском языке."},
                 {"role": "user", "content": prompt}
             ],
             "temperature": 0.7
@@ -203,6 +205,7 @@ class GroqClient(BaseAPIClient):
         data = {
             "model": model,
             "messages": [
+                {"role": "system", "content": "Ты помощник, который всегда отвечает на русском языке. Все твои ответы должны быть на русском языке."},
                 {"role": "user", "content": prompt}
             ],
             "temperature": 0.7
@@ -256,6 +259,7 @@ class OpenRouterClient(BaseAPIClient):
         data = {
             "model": model,
             "messages": [
+                {"role": "system", "content": "Ты помощник, который всегда отвечает на русском языке. Все твои ответы должны быть на русском языке."},
                 {"role": "user", "content": prompt}
             ],
             "temperature": 0.7

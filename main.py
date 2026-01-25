@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import (
     QFormLayout, QGroupBox, QSplitter, QProgressBar, QTabWidget, QFileDialog,
     QSpinBox, QDoubleSpinBox
 )
+from PyQt5.QtWidgets import QHeaderView
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QFont
 import db
@@ -218,8 +219,11 @@ class MainWindow(QMainWindow):
         self.results_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.results_table.setSortingEnabled(True)  # Включаем сортировку
         self.results_table.setColumnWidth(0, 150)
-        self.results_table.setColumnWidth(1, 400)
+        self.results_table.setColumnWidth(1, 500)  # Увеличена ширина для ответов
         self.results_table.setColumnWidth(2, 80)
+        # Настраиваем высоту строк для многострочного отображения
+        self.results_table.verticalHeader().setDefaultSectionSize(100)  # Минимальная высота строки
+        self.results_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)  # Автоматическая высота
         results_layout.addWidget(self.results_table)
         
         results_buttons_layout = QHBoxLayout()
@@ -260,7 +264,10 @@ class MainWindow(QMainWindow):
         self.saved_results_table.setColumnWidth(0, 150)
         self.saved_results_table.setColumnWidth(1, 200)
         self.saved_results_table.setColumnWidth(2, 150)
-        self.saved_results_table.setColumnWidth(3, 400)
+        self.saved_results_table.setColumnWidth(3, 500)  # Увеличена ширина для ответов
+        # Настраиваем высоту строк для многострочного отображения
+        self.saved_results_table.verticalHeader().setDefaultSectionSize(100)  # Минимальная высота строки
+        self.saved_results_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)  # Автоматическая высота
         
         # Кнопка экспорта для сохраненных результатов
         export_layout = QHBoxLayout()
@@ -336,7 +343,17 @@ class MainWindow(QMainWindow):
                 self.saved_results_table.setItem(i, 0, QTableWidgetItem(result.get('created_at', '')))
                 self.saved_results_table.setItem(i, 1, QTableWidgetItem(result.get('prompt', '')))
                 self.saved_results_table.setItem(i, 2, QTableWidgetItem(result.get('model_name', '')))
-                self.saved_results_table.setItem(i, 3, QTableWidgetItem(result.get('response_text', '')))
+                # Ответ - используем QTextEdit для многострочного отображения
+                response_text = result.get('response_text', '')
+                text_edit = QTextEdit()
+                text_edit.setPlainText(response_text)
+                text_edit.setReadOnly(True)
+                text_edit.setFrameShape(QTextEdit.NoFrame)  # Убираем рамку
+                text_edit.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+                text_edit.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+                text_edit.setMinimumHeight(80)
+                text_edit.setMaximumHeight(300)
+                self.saved_results_table.setCellWidget(i, 3, text_edit)
         except Exception as e:
             QMessageBox.warning(self, "Ошибка", f"Не удалось загрузить результаты: {str(e)}")
     
@@ -450,11 +467,22 @@ class MainWindow(QMainWindow):
             # Модель
             self.results_table.setItem(i, 0, QTableWidgetItem(result['model_name']))
             
-            # Ответ
+            # Ответ - используем QTextEdit для многострочного отображения
             response_text = result['response_text']
             if result.get('error'):
                 response_text = f"Ошибка: {result['error']}"
-            self.results_table.setItem(i, 1, QTableWidgetItem(response_text))
+            
+            # Создаем QTextEdit для ячейки с ответом
+            text_edit = QTextEdit()
+            text_edit.setPlainText(response_text)
+            text_edit.setReadOnly(True)
+            text_edit.setFrameShape(QTextEdit.NoFrame)  # Убираем рамку
+            text_edit.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)  # Скроллбар при необходимости
+            text_edit.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+            # Устанавливаем минимальную высоту
+            text_edit.setMinimumHeight(80)
+            text_edit.setMaximumHeight(300)  # Максимальная высота для предотвращения слишком больших ячеек
+            self.results_table.setCellWidget(i, 1, text_edit)
             
             # Чекбокс
             checkbox = QCheckBox()
@@ -529,7 +557,17 @@ class MainWindow(QMainWindow):
                 self.saved_results_table.setItem(i, 0, QTableWidgetItem(result.get('created_at', '')))
                 self.saved_results_table.setItem(i, 1, QTableWidgetItem(result.get('prompt', '')))
                 self.saved_results_table.setItem(i, 2, QTableWidgetItem(result.get('model_name', '')))
-                self.saved_results_table.setItem(i, 3, QTableWidgetItem(result.get('response_text', '')))
+                # Ответ - используем QTextEdit для многострочного отображения
+                response_text = result.get('response_text', '')
+                text_edit = QTextEdit()
+                text_edit.setPlainText(response_text)
+                text_edit.setReadOnly(True)
+                text_edit.setFrameShape(QTextEdit.NoFrame)  # Убираем рамку
+                text_edit.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+                text_edit.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+                text_edit.setMinimumHeight(80)
+                text_edit.setMaximumHeight(300)
+                self.saved_results_table.setCellWidget(i, 3, text_edit)
         except Exception as e:
             QMessageBox.warning(self, "Ошибка", f"Ошибка поиска: {str(e)}")
     
