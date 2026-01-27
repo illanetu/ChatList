@@ -462,3 +462,60 @@ def set_setting(key: str, value: str) -> bool:
         raise Exception(f"Ошибка при установке настройки: {e}")
     finally:
         conn.close()
+
+
+# ==================== Настройки AI-ассистента для улучшения промтов ====================
+
+def get_prompt_improver_model() -> Optional[int]:
+    """
+    Получает ID модели для улучшения промтов.
+    
+    Returns:
+        ID модели или None, если не установлено
+    """
+    model_id = get_setting('prompt_improver_model')
+    if model_id:
+        try:
+            return int(model_id)
+        except:
+            return None
+    return None
+
+
+def set_prompt_improver_model(model_id: Optional[int]) -> bool:
+    """
+    Устанавливает модель для улучшения промтов.
+    
+    Args:
+        model_id: ID модели или None для сброса
+    
+    Returns:
+        True при успехе
+    """
+    if model_id is None:
+        return set_setting('prompt_improver_model', '')
+    return set_setting('prompt_improver_model', str(model_id))
+
+
+def is_prompt_improver_enabled() -> bool:
+    """
+    Проверяет, включен ли AI-ассистент для улучшения промтов.
+    
+    Returns:
+        True если включен, False иначе
+    """
+    enabled = get_setting('prompt_improver_enabled', '1')
+    return enabled == '1'
+
+
+def set_prompt_improver_enabled(enabled: bool) -> bool:
+    """
+    Включает или выключает AI-ассистент для улучшения промтов.
+    
+    Args:
+        enabled: True для включения, False для выключения
+    
+    Returns:
+        True при успехе
+    """
+    return set_setting('prompt_improver_enabled', '1' if enabled else '0')

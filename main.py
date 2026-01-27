@@ -18,6 +18,7 @@ import db
 import models
 import export
 import logger
+import prompt_improver
 from typing import List, Dict, Any, Optional
 import os
 
@@ -36,6 +37,23 @@ class RequestThread(QThread):
         """Выполняет отправку запросов в отдельном потоке."""
         results = models.send_to_models(self.prompt, self.model_list)
         self.finished.emit(results)
+
+
+class ImprovementThread(QThread):
+    """Поток для асинхронного улучшения промта."""
+    
+    finished = pyqtSignal(dict)  # Сигнал с результатами улучшения
+    
+    def __init__(self, prompt: str, model_data: Optional[Dict[str, Any]], improvement_type: str):
+        super().__init__()
+        self.prompt = prompt
+        self.model_data = model_data
+        self.improvement_type = improvement_type
+    
+    def run(self):
+        """Выполняет улучшение промта в отдельном потоке."""
+        result = prompt_improver.improve_prompt(self.prompt, self.model_data, self.improvement_type)
+        self.finished.emit(result)
 
 
 class ModelDialog(QDialog):
@@ -154,9 +172,12 @@ class MainWindow(QMainWindow):
         buttons_layout = QHBoxLayout()
         self.send_button = QPushButton("Отправить запрос")
         self.send_button.clicked.connect(self.on_send_request)
+        self.improve_prompt_button = QPushButton("Улучшить промт")
+        self.improve_prompt_button.clicked.connect(self.on_improve_prompt)
         self.save_prompt_button = QPushButton("Сохранить промт")
         self.save_prompt_button.clicked.connect(self.on_save_prompt)
         buttons_layout.addWidget(self.send_button)
+        buttons_layout.addWidget(self.improve_prompt_button)
         buttons_layout.addWidget(self.save_prompt_button)
         prompt_layout.addLayout(buttons_layout)
         
@@ -491,6 +512,55 @@ class MainWindow(QMainWindow):
         dialog = ResultDetailDialog(self, result, prompt_text)
         dialog.exec_()
     
+    def on_improve_prompt(self):
+        """Открывает диалог для улучшения промта."""
+        prompt_text = self.prompt_edit.toPlainText().strip()
+        if not prompt_text:
+            QMessageBox.warning(self, "Предупреждение", "Введите промт для улучшения")
+            return
+        
+        # Получаем модель для улучшения из настроек
+        model_id = db.get_prompt_improver_model()
+        model_data = None
+        
+        if model_id:
+            try:
+                models_list = db.get_all_models()
+                model_dict = next((m for m in models_list if m['id'] == model_id), None)
+                if model_dict:
+                    model_data = {
+                        'name': model_dict['name'],
+                        'api_url': model_dict['api_url'],
+                        'api_id': model_dict['api_id']
+                    }
+            except:
+                pass
+        
+        # Если модель не выбрана, используем первую активную
+        if not model_data:
+            try:
+                active_models = models.get_active_models()
+                if active_models:
+                    model = active_models[0]
+                    model_data = {
+                        'name': model.name,
+                        'api_url': model.api_url,
+                        'api_id': model.api_id
+                    }
+            except:
+                pass
+        
+        if not model_data:
+            QMessageBox.warning(self, "Предупреждение", "Нет доступных моделей для улучшения промта")
+            return
+        
+        # Открываем диалог улучшения
+        dialog = PromptImprovementDialog(self, prompt_text, model_data)
+        if dialog.exec_() == QDialog.Accepted:
+            selected_prompt = dialog.get_selected_prompt()
+            if selected_prompt:
+                self.prompt_edit.setPlainText(selected_prompt)
+    
     def on_clear_results(self):
         """Очищает временную таблицу результатов."""
         self.results_table.setRowCount(0)
@@ -632,7 +702,10 @@ class MainWindow(QMainWindow):
             settings = dialog.get_settings()
             try:
                 for key, value in settings.items():
-                    db.set_setting(key, str(value))
+                    if key == 'prompt_improver_model':
+                        db.set_prompt_improver_model(value)
+                    else:
+                        db.set_setting(key, str(value))
                 self.load_settings()
                 QMessageBox.information(self, "Успех", "Настройки сохранены")
             except Exception as e:
@@ -717,6 +790,221 @@ class ResultDetailDialog(QDialog):
                 self.response_text.setPlainText(response_text)
 
 
+class PromptImprovementDialog(QDialog):
+    """Диалог для улучшения промта с помощью AI."""
+    
+    def __init__(self, parent=None, original_prompt: str = "", model_data: Optional[Dict[str, Any]] = None):
+        super().__init__(parent)
+        self.original_prompt = original_prompt
+        self.model_data = model_data
+        self.improvement_result = None
+        self.selected_prompt = None
+        self.setWindowTitle("Улучшение промта")
+        self.setModal(True)
+        self.setGeometry(200, 200, 900, 700)
+        self.init_ui()
+        self.load_models()
+    
+    def init_ui(self):
+        """Инициализирует интерфейс."""
+        layout = QVBoxLayout()
+        
+        # Выбор типа улучшения
+        type_layout = QHBoxLayout()
+        type_layout.addWidget(QLabel("Тип улучшения:"))
+        self.improvement_type_combo = QComboBox()
+        self.improvement_type_combo.addItem("Общее улучшение", "general")
+        self.improvement_type_combo.addItem("Переформулировка", "rephrase")
+        self.improvement_type_combo.addItem("Адаптация под код", "code")
+        self.improvement_type_combo.addItem("Адаптация под анализ", "analysis")
+        self.improvement_type_combo.addItem("Адаптация под креатив", "creative")
+        type_layout.addWidget(self.improvement_type_combo)
+        
+        # Выбор модели
+        type_layout.addWidget(QLabel("Модель:"))
+        self.model_combo = QComboBox()
+        type_layout.addWidget(self.model_combo)
+        
+        # Кнопка улучшения
+        self.improve_button = QPushButton("Улучшить")
+        self.improve_button.clicked.connect(self.on_improve)
+        type_layout.addWidget(self.improve_button)
+        layout.addLayout(type_layout)
+        
+        # Исходный промт
+        original_group = QGroupBox("Исходный промт")
+        original_layout = QVBoxLayout()
+        self.original_text = QTextEdit()
+        self.original_text.setPlainText(self.original_prompt)
+        self.original_text.setReadOnly(True)
+        self.original_text.setMaximumHeight(100)
+        original_layout.addWidget(self.original_text)
+        original_group.setLayout(original_layout)
+        layout.addWidget(original_group)
+        
+        # Индикатор загрузки
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setVisible(False)
+        layout.addWidget(self.progress_bar)
+        
+        # Улучшенная версия
+        improved_group = QGroupBox("Улучшенная версия")
+        improved_layout = QVBoxLayout()
+        self.improved_text = QTextEdit()
+        self.improved_text.setReadOnly(True)
+        self.improved_text.setMaximumHeight(150)
+        improved_layout.addWidget(self.improved_text)
+        
+        use_improved_button = QPushButton("Подставить улучшенную версию")
+        use_improved_button.clicked.connect(lambda: self.on_use_prompt(self.improved_text.toPlainText()))
+        improved_layout.addWidget(use_improved_button)
+        improved_group.setLayout(improved_layout)
+        layout.addWidget(improved_group)
+        
+        # Альтернативные варианты
+        alternatives_group = QGroupBox("Альтернативные варианты")
+        alternatives_layout = QVBoxLayout()
+        self.alternatives_widget = QWidget()
+        self.alternatives_layout = QVBoxLayout()
+        self.alternatives_widget.setLayout(self.alternatives_layout)
+        alternatives_layout.addWidget(self.alternatives_widget)
+        alternatives_group.setLayout(alternatives_layout)
+        layout.addWidget(alternatives_group, stretch=1)
+        
+        # Кнопки закрытия
+        buttons_layout = QHBoxLayout()
+        buttons_layout.addStretch()
+        close_button = QPushButton("Закрыть")
+        close_button.clicked.connect(self.reject)
+        buttons_layout.addWidget(close_button)
+        layout.addLayout(buttons_layout)
+        
+        self.setLayout(layout)
+    
+    def load_models(self):
+        """Загружает список моделей для выбора."""
+        try:
+            models_list = db.get_all_models()
+            self.model_combo.clear()
+            
+            # Устанавливаем выбранную модель из настроек или первую активную
+            selected_model_id = db.get_prompt_improver_model()
+            selected_index = 0
+            
+            for i, model_dict in enumerate(models_list):
+                model_name = model_dict['name']
+                self.model_combo.addItem(model_name, model_dict)
+                if model_dict['id'] == selected_model_id:
+                    selected_index = i
+            
+            self.model_combo.setCurrentIndex(selected_index)
+        except Exception as e:
+            QMessageBox.warning(self, "Ошибка", f"Не удалось загрузить модели: {str(e)}")
+    
+    def on_improve(self):
+        """Запускает процесс улучшения промта."""
+        if not self.original_prompt.strip():
+            QMessageBox.warning(self, "Предупреждение", "Промт не может быть пустым")
+            return
+        
+        # Получаем выбранную модель
+        model_dict = self.model_combo.currentData()
+        if not model_dict:
+            QMessageBox.warning(self, "Предупреждение", "Выберите модель для улучшения")
+            return
+        
+        model_data = {
+            'name': model_dict['name'],
+            'api_url': model_dict['api_url'],
+            'api_id': model_dict['api_id']
+        }
+        
+        # Получаем тип улучшения
+        improvement_type = self.improvement_type_combo.currentData()
+        
+        # Показываем индикатор загрузки
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setRange(0, 0)
+        self.improve_button.setEnabled(False)
+        
+        # Очищаем предыдущие результаты
+        self.improved_text.clear()
+        self.clear_alternatives()
+        
+        # Запускаем улучшение в отдельном потоке
+        self.improvement_thread = ImprovementThread(
+            self.original_prompt,
+            model_data,
+            improvement_type
+        )
+        self.improvement_thread.finished.connect(self.on_improvement_finished)
+        self.improvement_thread.start()
+    
+    def on_improvement_finished(self, result: Dict[str, Any]):
+        """Обработчик завершения улучшения промта."""
+        self.progress_bar.setVisible(False)
+        self.improve_button.setEnabled(True)
+        
+        if result.get('error'):
+            QMessageBox.critical(self, "Ошибка", f"Не удалось улучшить промт: {result['error']}")
+            return
+        
+        # Отображаем улучшенную версию
+        improved_text = result.get('improved', '')
+        if improved_text:
+            self.improved_text.setPlainText(improved_text)
+        else:
+            self.improved_text.setPlainText("Не удалось получить улучшенную версию")
+        
+        # Отображаем альтернативные варианты
+        alternatives = result.get('alternatives', [])
+        if alternatives:
+            self.show_alternatives(alternatives)
+        else:
+            # Если альтернативы не найдены, но есть улучшенная версия, используем её
+            if improved_text:
+                QMessageBox.information(self, "Информация", 
+                                       "Получена улучшенная версия, но альтернативные варианты не найдены")
+    
+    def show_alternatives(self, alternatives: List[str]):
+        """Отображает альтернативные варианты промта."""
+        self.clear_alternatives()
+        
+        for i, alt_text in enumerate(alternatives, 1):
+            alt_group = QGroupBox(f"Вариант {i}")
+            alt_layout = QVBoxLayout()
+            
+            alt_text_edit = QTextEdit()
+            alt_text_edit.setPlainText(alt_text)
+            alt_text_edit.setReadOnly(True)
+            alt_text_edit.setMaximumHeight(100)
+            alt_layout.addWidget(alt_text_edit)
+            
+            use_button = QPushButton(f"Подставить вариант {i}")
+            use_button.clicked.connect(lambda checked, text=alt_text: self.on_use_prompt(text))
+            alt_layout.addWidget(use_button)
+            
+            alt_group.setLayout(alt_layout)
+            self.alternatives_layout.addWidget(alt_group)
+    
+    def clear_alternatives(self):
+        """Очищает виджеты альтернативных вариантов."""
+        while self.alternatives_layout.count():
+            item = self.alternatives_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+    
+    def on_use_prompt(self, prompt_text: str):
+        """Обработчик кнопки подстановки промта."""
+        if prompt_text.strip():
+            self.selected_prompt = prompt_text
+            self.accept()
+    
+    def get_selected_prompt(self) -> Optional[str]:
+        """Возвращает выбранный промт для подстановки."""
+        return self.selected_prompt
+
+
 class SettingsDialog(QDialog):
     """Диалог настроек приложения."""
     
@@ -741,6 +1029,10 @@ class SettingsDialog(QDialog):
         self.max_retries_spin.setMaximum(10)
         layout.addRow("Максимум повторных попыток:", self.max_retries_spin)
         
+        # Модель для улучшения промтов
+        self.improver_model_combo = QComboBox()
+        layout.addRow("Модель для улучшения промтов:", self.improver_model_combo)
+        
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
@@ -761,12 +1053,33 @@ class SettingsDialog(QDialog):
             self.max_retries_spin.setValue(max_retries)
         except:
             self.max_retries_spin.setValue(3)
+        
+        # Загружаем список моделей для улучшения промтов
+        try:
+            models_list = db.get_all_models()
+            self.improver_model_combo.clear()
+            self.improver_model_combo.addItem("(Не выбрано)", None)
+            
+            selected_model_id = db.get_prompt_improver_model()
+            selected_index = 0
+            
+            for i, model_dict in enumerate(models_list):
+                model_name = model_dict['name']
+                self.improver_model_combo.addItem(model_name, model_dict['id'])
+                if model_dict['id'] == selected_model_id:
+                    selected_index = i + 1  # +1 из-за "(Не выбрано)"
+            
+            self.improver_model_combo.setCurrentIndex(selected_index)
+        except Exception as e:
+            QMessageBox.warning(self, "Ошибка", f"Не удалось загрузить модели: {str(e)}")
     
     def get_settings(self) -> Dict[str, Any]:
         """Возвращает настройки из формы."""
+        model_id = self.improver_model_combo.currentData()
         return {
             'timeout': self.timeout_spin.value(),
-            'max_retries': self.max_retries_spin.value()
+            'max_retries': self.max_retries_spin.value(),
+            'prompt_improver_model': model_id
         }
 
 
