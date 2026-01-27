@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtWidgets import QHeaderView
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, PYQT_VERSION_STR
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QIcon
 import db
 import models
 import export
@@ -127,6 +127,11 @@ class MainWindow(QMainWindow):
         """Инициализирует интерфейс."""
         self.setWindowTitle("ChatList - Сравнение ответов нейросетей")
         self.setGeometry(100, 100, 1200, 800)
+        
+        # Устанавливаем иконку окна
+        icon_path = os.path.join(os.path.dirname(__file__), "app.ico")
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
         
         # Создаем меню
         self.create_menu()
@@ -1660,6 +1665,12 @@ class ModelManagementDialog(QDialog):
 
 def main():
     app = QApplication(sys.argv)
+    
+    # Устанавливаем иконку приложения
+    icon_path = os.path.join(os.path.dirname(__file__), "app.ico")
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
+    
     window = MainWindow()
     window.show()
     sys.exit(app.exec_())
