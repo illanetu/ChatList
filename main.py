@@ -9,10 +9,10 @@ from PyQt5.QtWidgets import (
     QTextEdit, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem,
     QLabel, QComboBox, QCheckBox, QMessageBox, QDialog, QDialogButtonBox,
     QFormLayout, QGroupBox, QSplitter, QProgressBar, QTabWidget, QFileDialog,
-    QSpinBox, QDoubleSpinBox
+    QSpinBox, QDoubleSpinBox, QRadioButton, QButtonGroup
 )
 from PyQt5.QtWidgets import QHeaderView
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, PYQT_VERSION_STR
 from PyQt5.QtGui import QFont
 import db
 import models
@@ -612,6 +612,138 @@ class MainWindow(QMainWindow):
             self.timeout = int(timeout)
         except:
             self.timeout = 30
+        
+        # Применяем тему и размер шрифта
+        theme = db.get_theme()
+        self.apply_theme(theme)
+        
+        font_size = db.get_font_size()
+        self.set_font_size(font_size)
+    
+    def apply_theme(self, theme_name: str):
+        """Применяет тему ко всему приложению."""
+        if theme_name == 'dark':
+            # Темная тема
+            dark_style = """
+                QMainWindow, QWidget {
+                    background-color: #2b2b2b;
+                    color: #ffffff;
+                }
+                QTextEdit, QLineEdit, QComboBox {
+                    background-color: #3c3c3c;
+                    color: #ffffff;
+                    border: 1px solid #555555;
+                }
+                QPushButton {
+                    background-color: #404040;
+                    color: #ffffff;
+                    border: 1px solid #555555;
+                    padding: 5px;
+                }
+                QPushButton:hover {
+                    background-color: #505050;
+                }
+                QPushButton:pressed {
+                    background-color: #353535;
+                }
+                QTableWidget {
+                    background-color: #3c3c3c;
+                    color: #ffffff;
+                    gridline-color: #555555;
+                }
+                QTableWidget::item {
+                    background-color: #3c3c3c;
+                    color: #ffffff;
+                }
+                QTableWidget::item:selected {
+                    background-color: #505050;
+                }
+                QHeaderView::section {
+                    background-color: #404040;
+                    color: #ffffff;
+                    padding: 5px;
+                    border: 1px solid #555555;
+                }
+                QGroupBox {
+                    color: #ffffff;
+                    border: 1px solid #555555;
+                    margin-top: 10px;
+                }
+                QGroupBox::title {
+                    subcontrol-origin: margin;
+                    left: 10px;
+                    padding: 0 5px;
+                }
+                QTabWidget::pane {
+                    border: 1px solid #555555;
+                    background-color: #2b2b2b;
+                }
+                QTabBar::tab {
+                    background-color: #404040;
+                    color: #ffffff;
+                    padding: 5px 10px;
+                    border: 1px solid #555555;
+                }
+                QTabBar::tab:selected {
+                    background-color: #505050;
+                }
+                QCheckBox {
+                    color: #ffffff;
+                }
+                QLabel {
+                    color: #ffffff;
+                }
+                QProgressBar {
+                    border: 1px solid #555555;
+                    background-color: #3c3c3c;
+                    text-align: center;
+                }
+                QProgressBar::chunk {
+                    background-color: #505050;
+                }
+                QDialog {
+                    background-color: #2b2b2b;
+                    color: #ffffff;
+                }
+            """
+            self.setStyleSheet(dark_style)
+        else:
+            # Светлая тема (по умолчанию)
+            self.setStyleSheet("")
+    
+    def set_font_size(self, size: int):
+        """Применяет размер шрифта ко всем элементам интерфейса."""
+        font = QFont()
+        font.setPointSize(size)
+        
+        # Применяем шрифт ко всем виджетам
+        self.setFont(font)
+        
+        # Применяем к дочерним виджетам
+        for widget in self.findChildren(QWidget):
+            widget.setFont(font)
+    
+    def apply_settings(self, settings: Dict[str, Any]):
+        """Применяет настройки без сохранения в БД (для кнопки "Применить")."""
+        # Сохраняем настройки в БД
+        for key, value in settings.items():
+            if key == 'prompt_improver_model':
+                db.set_prompt_improver_model(value)
+            elif key == 'theme':
+                db.set_theme(value)
+                self.apply_theme(value)
+            elif key == 'font_size':
+                db.set_font_size(value)
+                self.set_font_size(value)
+            else:
+                db.set_setting(key, str(value))
+        
+        # Обновляем таймаут
+        if 'timeout' in settings:
+            try:
+                self.timeout = int(settings['timeout'])
+            except:
+                self.timeout = 30
     
     def on_export_markdown(self):
         """Экспортирует результаты в Markdown."""
@@ -704,19 +836,51 @@ class MainWindow(QMainWindow):
                 for key, value in settings.items():
                     if key == 'prompt_improver_model':
                         db.set_prompt_improver_model(value)
+                    elif key == 'theme':
+                        db.set_theme(value)
+                        self.apply_theme(value)
+                    elif key == 'font_size':
+                        db.set_font_size(value)
+                        self.set_font_size(value)
                     else:
                         db.set_setting(key, str(value))
-                self.load_settings()
+                
+                # Обновляем таймаут
+                if 'timeout' in settings:
+                    try:
+                        self.timeout = int(settings['timeout'])
+                    except:
+                        self.timeout = 30
+                
                 QMessageBox.information(self, "Успех", "Настройки сохранены")
             except Exception as e:
                 QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить настройки: {str(e)}")
     
     def on_about(self):
         """Показывает информацию о программе."""
-        QMessageBox.about(self, "О программе", 
-                         "ChatList v1.0\n\n"
-                         "Приложение для сравнения ответов различных нейросетей.\n"
-                         "Отправляйте один промт в несколько моделей и сравнивайте результаты.")
+        about_text = f"""
+        <h2>ChatList v1.0</h2>
+        <p><b>Приложение для сравнения ответов различных нейросетей</b></p>
+        <p>Отправляйте один промт в несколько моделей и сравнивайте результаты.</p>
+        <hr>
+        <h3>Основные возможности:</h3>
+        <ul>
+            <li>Отправка промтов в несколько AI-моделей одновременно</li>
+            <li>Сравнение ответов в удобной таблице</li>
+            <li>Сохранение промтов и результатов в базе данных</li>
+            <li>Управление моделями (OpenAI, DeepSeek, Groq, OpenRouter)</li>
+            <li>AI-ассистент для улучшения промтов</li>
+            <li>Экспорт результатов в Markdown и JSON</li>
+            <li>Настройка темы и размера шрифта</li>
+        </ul>
+        <hr>
+        <p><b>Версия Python:</b> {sys.version.split()[0]}</p>
+        <p><b>Версия PyQt5:</b> {PYQT_VERSION_STR}</p>
+        <hr>
+        <p>Разработано для удобного сравнения ответов различных AI-моделей.</p>
+        """
+        
+        QMessageBox.about(self, "О программе", about_text)
 
 
 class ResultDetailDialog(QDialog):
@@ -1016,29 +1180,65 @@ class SettingsDialog(QDialog):
         self.load_settings()
     
     def init_ui(self):
-        layout = QFormLayout()
+        main_layout = QVBoxLayout()
+        
+        # Основные настройки
+        settings_group = QGroupBox("Основные настройки")
+        settings_layout = QFormLayout()
         
         self.timeout_spin = QSpinBox()
         self.timeout_spin.setMinimum(5)
         self.timeout_spin.setMaximum(300)
         self.timeout_spin.setSuffix(" секунд")
-        layout.addRow("Таймаут запросов:", self.timeout_spin)
+        settings_layout.addRow("Таймаут запросов:", self.timeout_spin)
         
         self.max_retries_spin = QSpinBox()
         self.max_retries_spin.setMinimum(1)
         self.max_retries_spin.setMaximum(10)
-        layout.addRow("Максимум повторных попыток:", self.max_retries_spin)
+        settings_layout.addRow("Максимум повторных попыток:", self.max_retries_spin)
         
         # Модель для улучшения промтов
         self.improver_model_combo = QComboBox()
-        layout.addRow("Модель для улучшения промтов:", self.improver_model_combo)
+        settings_layout.addRow("Модель для улучшения промтов:", self.improver_model_combo)
         
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        settings_group.setLayout(settings_layout)
+        main_layout.addWidget(settings_group)
+        
+        # Внешний вид
+        appearance_group = QGroupBox("Внешний вид")
+        appearance_layout = QFormLayout()
+        
+        # Выбор темы
+        theme_layout = QHBoxLayout()
+        self.theme_group = QButtonGroup()
+        self.light_theme_radio = QRadioButton("Светлая")
+        self.dark_theme_radio = QRadioButton("Темная")
+        self.theme_group.addButton(self.light_theme_radio, 0)
+        self.theme_group.addButton(self.dark_theme_radio, 1)
+        theme_layout.addWidget(self.light_theme_radio)
+        theme_layout.addWidget(self.dark_theme_radio)
+        theme_layout.addStretch()
+        appearance_layout.addRow("Тема:", theme_layout)
+        
+        # Размер шрифта
+        self.font_size_spin = QSpinBox()
+        self.font_size_spin.setMinimum(8)
+        self.font_size_spin.setMaximum(24)
+        self.font_size_spin.setSuffix(" пунктов")
+        appearance_layout.addRow("Размер шрифта:", self.font_size_spin)
+        
+        appearance_group.setLayout(appearance_layout)
+        main_layout.addWidget(appearance_group)
+        
+        # Кнопки
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel | QDialogButtonBox.Apply)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
-        layout.addRow(buttons)
+        apply_button = buttons.button(QDialogButtonBox.Apply)
+        apply_button.clicked.connect(self.on_apply)
+        main_layout.addWidget(buttons)
         
-        self.setLayout(layout)
+        self.setLayout(main_layout)
     
     def load_settings(self):
         """Загружает текущие настройки."""
@@ -1072,14 +1272,34 @@ class SettingsDialog(QDialog):
             self.improver_model_combo.setCurrentIndex(selected_index)
         except Exception as e:
             QMessageBox.warning(self, "Ошибка", f"Не удалось загрузить модели: {str(e)}")
+        
+        # Загружаем тему
+        theme = db.get_theme()
+        if theme == 'dark':
+            self.dark_theme_radio.setChecked(True)
+        else:
+            self.light_theme_radio.setChecked(True)
+        
+        # Загружаем размер шрифта
+        font_size = db.get_font_size()
+        self.font_size_spin.setValue(font_size)
+    
+    def on_apply(self):
+        """Применяет настройки без закрытия диалога."""
+        settings = self.get_settings()
+        if self.parent():
+            self.parent().apply_settings(settings)
     
     def get_settings(self) -> Dict[str, Any]:
         """Возвращает настройки из формы."""
         model_id = self.improver_model_combo.currentData()
+        theme = 'dark' if self.dark_theme_radio.isChecked() else 'light'
         return {
             'timeout': self.timeout_spin.value(),
             'max_retries': self.max_retries_spin.value(),
-            'prompt_improver_model': model_id
+            'prompt_improver_model': model_id,
+            'theme': theme,
+            'font_size': self.font_size_spin.value()
         }
 
 

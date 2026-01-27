@@ -519,3 +519,65 @@ def set_prompt_improver_enabled(enabled: bool) -> bool:
         True при успехе
     """
     return set_setting('prompt_improver_enabled', '1' if enabled else '0')
+
+
+# ==================== Настройки темы и шрифта ====================
+
+def get_theme() -> str:
+    """
+    Получает текущую тему приложения.
+    
+    Returns:
+        'light' или 'dark', по умолчанию 'light'
+    """
+    theme = get_setting('theme', 'light')
+    if theme in ['light', 'dark']:
+        return theme
+    return 'light'
+
+
+def set_theme(theme_name: str) -> bool:
+    """
+    Устанавливает тему приложения.
+    
+    Args:
+        theme_name: 'light' или 'dark'
+    
+    Returns:
+        True при успехе
+    """
+    if theme_name in ['light', 'dark']:
+        return set_setting('theme', theme_name)
+    return False
+
+
+def get_font_size() -> int:
+    """
+    Получает размер шрифта приложения.
+    
+    Returns:
+        Размер шрифта в пунктах, по умолчанию 10
+    """
+    font_size = get_setting('font_size', '10')
+    try:
+        size = int(font_size)
+        if 8 <= size <= 24:
+            return size
+    except:
+        pass
+    return 10
+
+
+def set_font_size(size: int) -> bool:
+    """
+    Устанавливает размер шрифта приложения.
+    
+    Args:
+        size: Размер шрифта в пунктах (8-24)
+    
+    Returns:
+        True при успехе
+    """
+    if 8 <= size <= 24:
+        return set_setting('font_size', str(size))
+    return False
