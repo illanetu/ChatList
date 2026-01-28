@@ -19,6 +19,7 @@ import models
 import export
 import logger
 import prompt_improver
+import version
 from typing import List, Dict, Any, Optional
 import os
 
@@ -117,6 +118,7 @@ class MainWindow(QMainWindow):
         self.current_prompt_id = None
         # Инициализируем логгер
         logger.setup_logger()
+        logger.log_startup(version.__version__)
         self.init_ui()
         self.init_database()
         self.load_settings()
@@ -125,7 +127,7 @@ class MainWindow(QMainWindow):
     
     def init_ui(self):
         """Инициализирует интерфейс."""
-        self.setWindowTitle("ChatList - Сравнение ответов нейросетей")
+        self.setWindowTitle(f"ChatList {version.__version__} - Сравнение ответов нейросетей")
         self.setGeometry(100, 100, 1200, 800)
         
         # Устанавливаем иконку окна
@@ -864,7 +866,7 @@ class MainWindow(QMainWindow):
     def on_about(self):
         """Показывает информацию о программе."""
         about_text = f"""
-        <h2>ChatList v1.0</h2>
+        <h2>ChatList {version.__version__}</h2>
         <p><b>Приложение для сравнения ответов различных нейросетей</b></p>
         <p>Отправляйте один промт в несколько моделей и сравнивайте результаты.</p>
         <hr>

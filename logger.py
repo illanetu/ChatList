@@ -33,7 +33,13 @@ def setup_logger():
         ]
     )
     
-    return logging.getLogger('ChatList')
+    logger = logging.getLogger('ChatList')
+    return logger
+
+
+def log_startup(version_str: str):
+    """Логирует запуск приложения с указанием версии."""
+    logging.getLogger('ChatList').info("ChatList v%s запущен", version_str)
 
 
 def log_request(prompt: str, model_name: str, success: bool, response: Optional[str] = None, error: Optional[str] = None):
