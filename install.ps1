@@ -22,14 +22,21 @@ if (-not (Test-Path $exePath)) {
 }
 
 $isccExe = $null
-$iscc = Get-Command iscc -ErrorAction SilentlyContinue
-if ($iscc) { $isccExe = $iscc.Source }
+if ($env:ISCC_PATH -and (Test-Path $env:ISCC_PATH)) { $isccExe = $env:ISCC_PATH }
 if (-not $isccExe) {
-    $p = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"
-    if (Test-Path $p) { $isccExe = $p }
+    $iscc = Get-Command iscc -ErrorAction SilentlyContinue
+    if ($iscc) { $isccExe = $iscc.Source }
+}
+$paths = @(
+    (Join-Path $env:LOCALAPPDATA "Programs\Inno Setup 6\ISCC.exe"),
+    (Join-Path $env:ProgramFiles "Inno Setup 6\ISCC.exe"),
+    (Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe")
+)
+foreach ($p in $paths) {
+    if (-not $isccExe -and $p -and (Test-Path $p)) { $isccExe = $p; break }
 }
 if (-not $isccExe) {
-    Write-Host "Error: Inno Setup 6 not found. Install it and add iscc to PATH." -ForegroundColor Red
+    Write-Host "Error: Inno Setup 6 not found. Install from https://jrsoftware.org/isdl.php or set ISCC_PATH to ISCC.exe path." -ForegroundColor Red
     exit 1
 }
 
