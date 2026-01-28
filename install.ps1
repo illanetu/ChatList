@@ -1,47 +1,46 @@
-# Сборка ChatList и создание инсталлятора Inno Setup
-# Требуется: Python, PyInstaller, Inno Setup 6 (iscc в PATH)
+# Build ChatList exe + Inno Setup installer
+# Requires: Python, PyInstaller, Inno Setup 6 (iscc in PATH or default install)
 
 Set-Location $PSScriptRoot
 
 $version = (python -c "import version; print(version.__version__)").Trim()
 $exeName = "ChatList-$version"
-$exePath = "dist\$exeName.exe"
+$exePath = Join-Path dist ($exeName + ".exe")
 
-Write-Host "ChatList $version — сборка и инсталлятор" -ForegroundColor Cyan
+Write-Host "ChatList $version - build and installer" -ForegroundColor Cyan
 Write-Host ""
 
-# 1. Сборка exe
 if (-not (Test-Path $exePath)) {
-    Write-Host "Запуск build.ps1..." -ForegroundColor Yellow
-    & "$PSScriptRoot\build.ps1"
+    Write-Host "Running build.ps1..." -ForegroundColor Yellow
+    & (Join-Path $PSScriptRoot build.ps1)
     if (-not (Test-Path $exePath)) {
-        Write-Host "Ошибка: не найден $exePath" -ForegroundColor Red
+        Write-Host "Error: $exePath not found" -ForegroundColor Red
         exit 1
     }
 } else {
-    Write-Host "Найден exe: $exePath" -ForegroundColor Green
+    Write-Host "Found exe: $exePath" -ForegroundColor Green
 }
 
-# 2. Inno Setup
+$isccExe = $null
 $iscc = Get-Command iscc -ErrorAction SilentlyContinue
-if (-not $iscc) {
-    $isccPath = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-    if (Test-Path $isccPath) {
-        $iscc = $isccPath
-    } else {
-        Write-Host "Ошибка: Inno Setup 6 не найден. Установите и добавьте iscc в PATH или укажите путь к ISCC.exe." -ForegroundColor Red
-        exit 1
-    }
+if ($iscc) { $isccExe = $iscc.Source }
+if (-not $isccExe) {
+    $p = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"
+    if (Test-Path $p) { $isccExe = $p }
+}
+if (-not $isccExe) {
+    Write-Host "Error: Inno Setup 6 not found. Install it and add iscc to PATH." -ForegroundColor Red
+    exit 1
 }
 
 Write-Host ""
-Write-Host "Создание инсталлятора..." -ForegroundColor Green
-& $iscc /DMyAppVersion=$version "install.iss"
+Write-Host "Building installer..." -ForegroundColor Green
+& $isccExe /DMyAppVersion=$version install.iss
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host ""
-    Write-Host "Готово! Инсталлятор: installer\ChatList-$version-setup.exe" -ForegroundColor Green
+    Write-Host ("Done: install\ChatList-$version-setup.exe") -ForegroundColor Green
 } else {
-    Write-Host "Ошибка сборки инсталлятора (код $LASTEXITCODE)" -ForegroundColor Red
+    Write-Host ("Installer build failed, exit code " + $LASTEXITCODE) -ForegroundColor Red
     exit 1
 }

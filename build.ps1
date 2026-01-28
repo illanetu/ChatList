@@ -3,13 +3,17 @@ Set-Location $PSScriptRoot
 $version = (python -c "import version; print(version.__version__)").Trim()
 $exeName = "ChatList-$version"
 
-Write-Host "Версия: $version" -ForegroundColor Cyan
-Write-Host "Установка зависимостей..." -ForegroundColor Green
+Write-Host "Version: $version" -ForegroundColor Cyan
+Write-Host "Installing dependencies..." -ForegroundColor Green
 pip install -r requirements.txt
 
 Write-Host ""
-Write-Host "Создание исполняемого файла..." -ForegroundColor Green
-pyinstaller --onefile --windowed --name $exeName --icon "app.ico" --add-data "logs;logs" main.py
+Write-Host "Building exe..." -ForegroundColor Green
+if (Test-Path dist) {
+    Get-ChildItem dist -Filter "*.exe" | Remove-Item -Force
+}
+pyinstaller --onefile --windowed --name $exeName --icon app.ico --add-data "logs;logs" main.py
 
+$exePath = Join-Path dist ($exeName + ".exe")
 Write-Host ""
-Write-Host "Готово! Исполняемый файл: dist\$exeName.exe" -ForegroundColor Green
+Write-Host ("Done: " + $exePath) -ForegroundColor Green
