@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChatList — сравнение ответов нейросетей</title>
+  <meta name="description" content="Отправляйте один промт в несколько моделей одновременно и сравнивайте ответы. Windows-приложение с поддержкой OpenAI, DeepSeek, Groq, OpenRouter.">
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #79b8ff;
+      --border: #30363d;
+      --success: #3fb950;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+    .wrap {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+    header {
+      text-align: center;
+      padding: 3rem 0 2rem;
+      border-bottom: 1px solid var(--border);
+    }
+    h1 {
+      font-size: 2rem;
+      font-weight: 600;
+      margin: 0 0 0.5rem;
+      letter-spacing: -0.02em;
+    }
+    .tagline {
+      color: var(--muted);
+      font-size: 1.1rem;
+    }
+    .download {
+      margin: 2rem 0 2.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      justify-content: center;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.25rem;
+      background: var(--accent);
+      color: #fff;
+      text-decoration: none;
+      border-radius: 6px;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+    .btn:hover { background: var(--accent-hover); }
+    .btn.secondary {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn.secondary:hover { background: #21262d; }
+    section {
+      margin: 2rem 0;
+    }
+    h2 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin: 0 0 1rem;
+      color: var(--text);
+    }
+    ul {
+      margin: 0;
+      padding-left: 1.25rem;
+      color: var(--muted);
+    }
+    ul li { margin: 0.35rem 0; }
+    .features {
+      display: grid;
+      gap: 0.75rem;
+    }
+    .feature {
+      padding: 0.75rem 1rem;
+      background: var(--surface);
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+    .feature strong { color: var(--text); }
+    footer {
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      background: rgba(63, 185, 80, 0.2);
+      color: var(--success);
+      border-radius: 4px;
+      font-size: 0.85rem;
+      margin-left: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>ChatList</h1>
+      <p class="tagline">Один промт — несколько нейросетей. Сравнивайте ответы в одном окне.</p>
+    </header>
+
+    <div class="download">
+      <a href="https://github.com/YOUR_USERNAME/YOUR_REPO/releases/latest" class="btn">
+        Скачать для Windows
+        <span class="badge">последняя версия</span>
+      </a>
+      <a href="https://github.com/YOUR_USERNAME/YOUR_REPO" class="btn secondary">Исходный код на GitHub</a>
+    </div>
+
+    <section>
+      <h2>Возможности</h2>
+      <div class="features">
+        <div class="feature"><strong>Один промт — все модели.</strong> Отправляйте запрос в OpenAI, DeepSeek, Groq, OpenRouter одновременно.</div>
+        <div class="feature"><strong>Сохранение и поиск.</strong> Промты и результаты хранятся в SQLite, удобный поиск и сортировка.</div>
+        <div class="feature"><strong>Экспорт.</strong> Выгрузка результатов в Markdown и JSON.</div>
+        <div class="feature"><strong>Управление моделями.</strong> Добавление и настройка API через интерфейс, ключи в .env.</div>
+        <div class="feature"><strong>Удобный интерфейс.</strong> PyQt5, тёмная/светлая тема, настройка шрифтов.</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Требования</h2>
+      <ul>
+        <li>Windows 10/11</li>
+        <li>Для портативной версии — только скачать .exe</li>
+        <li>Для установки — запустить установщик ChatList-*-setup.exe</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Ссылки</h2>
+      <ul>
+        <li><a href="https://github.com/YOUR_USERNAME/YOUR_REPO/releases">Все релизы</a></li>
+        <li><a href="https://github.com/YOUR_USERNAME/YOUR_REPO/blob/main/README.md">Документация и установка из исходников</a></li>
+        <li><a href="https://github.com/YOUR_USERNAME/YOUR_REPO/blob/main/LICENSE">Лицензия</a></li>
+      </ul>
+    </section>
+
+    <footer>
+      <p>
+        <a href="https://github.com/YOUR_USERNAME/YOUR_REPO">ChatList</a> — приложение для сравнения ответов нейросетей.
+      </p>
+    </footer>
+  </div>
+</body>
+</html>
